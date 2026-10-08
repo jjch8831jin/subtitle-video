@@ -34,6 +34,10 @@ b{color:#f4f8fc}
 hr{border:0;border-top:1px solid #455c70;margin:12px 0}
 .line{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
 .hint{color:#dbe6f0;font-size:12pt}
+/* 카드 제목 줄 오른쪽에 파일 선택 결과 */
+section h2.hrow{display:flex;align-items:baseline;gap:12px;min-width:0}
+h2.hrow .st{font-size:12pt;font-weight:400;min-width:0;flex:1 1 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+h2.hrow .st:empty{display:none}
 /* 한 줄에 맞춰 줄어드는 줄 (버튼이 아랫줄로 밀리지 않게) */
 .line.nw{flex-wrap:nowrap;gap:6px}
 .line.nw input[type=file]{min-width:0;flex:1 1 0;overflow:hidden}
@@ -147,7 +151,7 @@ a.dl:hover{background:#ffc56b}
 
   <div class="pair">
   <section>
-    <h2>1. 배경</h2>
+    <h2 class="hrow">1. 배경<span class="st" id="bgStatus"></span></h2>
     <div class="line nw">화면 비율
       <select id="ratio">
         <option value="16:9">가로 16:9 (유튜브)</option>
@@ -166,7 +170,7 @@ a.dl:hover{background:#ffc56b}
   </section>
 
   <section>
-    <h2>2. 소리</h2>
+    <h2 class="hrow">2. 소리<span class="st" id="voiceStatus"></span><span class="st" id="bgmStatus"></span></h2>
     <div class="line nw">음성 파일 <input type="file" id="voiceFile" accept="audio/*"> <button id="voiceClr" class="gray">지우기</button></div>
     <div class="line">음성 볼륨 <input type="range" id="vVoice" class="vol" min="0" max="200" value="100"></div>
     <div class="line nw">배경음악 <input type="file" id="bgmFile" accept="audio/*"> <button id="bgmClr" class="gray">지우기</button></div>
@@ -271,29 +275,39 @@ function autoDur(){
   total=d>0?round1(d):(parseFloat($('dur').value)||10);
   $('dur').value=total;
 }
+function setStatus(id,ok,text){const el=$(id);el.textContent=text;el.title=text;el.style.color=ok?'#7dffa8':'#ff8a7c'}
+const VIDEO_EXT=/\.(mp4|m4v|mov|webm|mkv|avi|wmv|ogv)$/i;
 $('bgFile').onchange=e=>{
   const f=e.target.files[0];if(!f)return;
   const url=URL.createObjectURL(f);
-  if(f.type.startsWith('video/')){
-    bgKind='video';bgImg=null;
-    bgVideo.onloadedmetadata=()=>{autoDur();seek(0)};
+  if(f.type.startsWith('video/')||VIDEO_EXT.test(f.name)){
+    bgVideo.onloadedmetadata=()=>{bgKind='video';bgImg=null;autoDur();seek(0);setStatus('bgStatus',true,'동영상 불러옴 · '+f.name)};
+    bgVideo.onerror=()=>setStatus('bgStatus',false,'열 수 없는 동영상 · '+f.name);
     bgVideo.src=url;bgVideo.load();
   }else{
-    bgKind='image';bgVideo.removeAttribute('src');bgVideo.load();
-    const im=new Image();im.onload=()=>{bgImg=im;autoDur()};im.src=url;
+    const im=new Image();
+    im.onload=()=>{bgKind='image';bgImg=im;bgVideo.onloadedmetadata=null;bgVideo.onerror=null;bgVideo.removeAttribute('src');bgVideo.load();autoDur();setStatus('bgStatus',true,'사진 불러옴 · '+f.name)};
+    im.onerror=()=>setStatus('bgStatus',false,'열 수 없는 사진 · '+f.name);
+    im.src=url;
   }
+  e.target.value='';
 };
 $('voiceFile').onchange=e=>{
   const f=e.target.files[0];if(!f)return;
-  voice.onloadedmetadata=autoDur;
+  voice.onloadedmetadata=()=>{autoDur();setStatus('voiceStatus',true,'음성 불러옴 · '+f.name)};
+  voice.onerror=()=>setStatus('voiceStatus',false,'열 수 없는 음성 · '+f.name);
   voice.src=URL.createObjectURL(f);voice.load();
+  e.target.value='';
 };
 $('bgmFile').onchange=e=>{
   const f=e.target.files[0];if(!f)return;
+  bgm.onloadedmetadata=()=>setStatus('bgmStatus',true,'배경음악 불러옴 · '+f.name);
+  bgm.onerror=()=>setStatus('bgmStatus',false,'열 수 없는 배경음악 · '+f.name);
   bgm.src=URL.createObjectURL(f);bgm.load();
+  e.target.value='';
 };
-$('voiceClr').onclick=()=>{voice.pause();voice.removeAttribute('src');voice.load();$('voiceFile').value='';autoDur()};
-$('bgmClr').onclick=()=>{bgm.pause();bgm.removeAttribute('src');bgm.load();$('bgmFile').value=''};
+$('voiceClr').onclick=()=>{voice.onerror=null;voice.onloadedmetadata=null;voice.pause();voice.removeAttribute('src');voice.load();$('voiceFile').value='';autoDur();setStatus('voiceStatus',true,'')};
+$('bgmClr').onclick=()=>{bgm.onerror=null;bgm.onloadedmetadata=null;bgm.pause();bgm.removeAttribute('src');bgm.load();$('bgmFile').value='';setStatus('bgmStatus',true,'')};
 $('dur').onchange=()=>{const v=parseFloat($('dur').value);if(v>0){total=v;if(curT>total)curT=total}else $('dur').value=total};
 $('ratio').onchange=()=>{
   const r=$('ratio').value;
