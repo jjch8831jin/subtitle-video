@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>자막영상 만들기</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--line:#d8dce2;--main:#2f6fed;--txt:#1d2530;--sub:#5d6877}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;font-size:14pt;background:var(--bg);color:var(--txt)}
+header{padding:12px 20px;background:#1d2530;color:#fff;font-size:14pt;font-weight:700}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:16px;max-width:1800px;margin:0 auto;align-items:start}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px}
+h2{font-size:14pt;margin:0 0 10px;font-weight:700}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:var(--main);color:#fff;border:0;border-radius:8px;padding:6px 14px;cursor:pointer}
+button.gray{background:#e6e9ee;color:var(--txt)}
+button.red{background:#d9453b}
+button:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=number],select,textarea{border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:#fff}
+textarea{width:100%;resize:vertical}
+.line{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+.hint{color:var(--sub)}
+canvas{width:100%;height:auto;background:#000;border-radius:8px;display:block;max-height:70vh;object-fit:contain}
+#seek{width:100%}
+.row{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px}
+.row.on{border-color:var(--main);background:#eef3ff}
+.row .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.tm{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.tm input{width:5.5em}
+#rows{max-height:62vh;overflow:auto;padding-right:4px}
+#bar{height:14px;background:#e6e9ee;border-radius:7px;overflow:hidden;margin:8px 0}
+#barIn{height:100%;width:0;background:var(--main)}
+a.dl{display:inline-block;background:#1f9d55;color:#fff;text-decoration:none;border-radius:8px;padding:6px 14px}
+</style>
+</head>
+<body>
+<header>자막영상 만들기 — 이미지·동영상에 자막과 소리를 입혀 영상 파일로 저장</header>
+<main>
+<div>
+  <div class="card">
+    <h2>미리보기</h2>
+    <canvas id="cv" width="1280" height="720"></canvas>
+    <input type="range" id="seek" min="0" max="1000" value="0">
+    <div class="line">
+      <button id="btnPlay">▶ 재생</button>
+      <button id="btnHome" class="gray">⏮ 처음으로</button>
+      <span id="tm">0:00.0 / 0:10.0</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>1. 배경과 소리</h2>
+    <div class="line">화면 비율
+      <select id="ratio">
+        <option value="16:9">가로 16:9 (유튜브)</option>
+        <option value="9:16">세로 9:16 (폰)</option>
+        <option value="1:1">정사각 1:1</option>
+      </select>
+      배경 맞춤
+      <select id="fit">
+        <option value="cover">꽉 채우기(잘림)</option>
+        <option value="contain">전체 보이기(검은 여백)</option>
+      </select>
+    </div>
+    <div class="line">배경(이미지/동영상) <input type="file" id="bgFile" accept="image/*,video/*"></div>
+    <div class="line">영상 길이(초) <input type="number" id="dur" value="10" min="1" step="0.1" style="width:6em">
+      <span class="hint">음성·동영상을 불러오면 자동으로 맞춰져요. 이미지만 쓸 때는 직접 정하세요.</span></div>
+    <div class="line">음성 파일 <input type="file" id="voiceFile" accept="audio/*"> <button id="voiceClr" class="gray">지우기</button></div>
+    <div class="line">음성 볼륨 <input type="range" id="vVoice" min="0" max="200" value="100"></div>
+    <div class="line">배경음악 <input type="file" id="bgmFile" accept="audio/*"> <button id="bgmClr" class="gray">지우기</button></div>
+    <div class="line">배경음악 볼륨 <input type="range" id="vBgm" min="0" max="200" value="30">
+      <span class="hint">영상보다 짧으면 반복돼요.</span></div>
+    <div class="line"><label><input type="checkbox" id="vOrig" checked> 동영상 원래 소리 쓰기</label>
+      볼륨 <input type="range" id="vOrigVol" min="0" max="200" value="100"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. 자막 꾸미기</h2>
+    <div class="line">글자 크기 <input type="number" id="fs" value="48" min="10" max="200" style="width:5em">
+      글자색 <input type="color" id="fc" value="#ffffff">
+      굵게 <input type="checkbox" id="bold" checked></div>
+    <div class="line">외곽선 색 <input type="color" id="oc" value="#000000">
+      굵기 <input type="number" id="ow" value="5" min="0" max="20" style="width:4.5em">
+      글자 뒤 검은 박스 <input type="checkbox" id="box"></div>
+    <div class="line">위치
+      <select id="pos"><option value="bottom">아래</option><option value="mid">가운데</option><option value="top">위</option></select>
+      글꼴
+      <select id="ff">
+        <option value='"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif'>고딕</option>
+        <option value='"Batang","Noto Serif KR",serif'>바탕(명조)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>4. 영상으로 저장</h2>
+    <div class="line">저장 형식
+      <select id="fmt">
+        <option value="mp4">MP4 우선 (안 되면 WebM)</option>
+        <option value="webm">WebM</option>
+      </select>
+      <button id="btnExp">● 저장 시작</button>
+      <button id="btnCancel" class="red" style="display:none">취소</button>
+    </div>
+    <div class="hint">영상 길이만큼 시간이 걸려요. 저장하는 동안 이 탭을 닫거나 다른 탭으로 옮기지 마세요. 저장 중에는 소리가 나지 않아요.</div>
+    <div id="bar"><div id="barIn"></div></div>
+    <div id="expMsg" class="hint"></div>
+    <div id="result" style="display:none">
+      <video id="resV" controls style="width:100%;border-radius:8px;background:#000;max-height:50vh"></video>
+      <div class="line"><a id="dlA" class="dl" download>⬇ 영상 파일 내려받기</a><span id="resInfo" class="hint"></span></div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <div class="card">
+    <h2>3. 자막 넣기</h2>
+    <b>① 글만 붙여넣어 자동으로 나누기</b>
+    <textarea id="paste" rows="5" placeholder="대본을 여기에 붙여넣으세요."></textarea>
+    <div class="line">나누는 기준
+      <select id="splitMode"><option value="line">줄 단위</option><option value="sentence">문장 단위</option></select>
+      한 자막 최대 글자수 <input type="number" id="maxLen" value="30" min="0" style="width:5em">
+      <button id="btnSplit">자동 나누기</button>
+    </div>
+    <div class="hint">영상 길이에 글자 수 비율로 시간을 나눠요. 어긋나는 줄은 아래에서 고치세요. (최대 글자수 0 = 제한 없음)</div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+    <b>② 소리를 들으며 "지금" 눌러 시간 찍기</b>
+    <div class="line">
+      <button id="btnStampStart">▶ 처음부터 재생하며 찍기</button>
+      <button id="btnStamp" disabled>⏱ 다음 줄 지금!</button>
+    </div>
+    <div class="hint">재생되는 동안 다음 줄이 나올 때마다 "다음 줄 지금!" 버튼이나 스페이스바를 누르세요. 누른 시각이 그 줄의 시작이 되고, 앞 줄의 끝이 돼요.</div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+    <b>③ 줄별로 직접 고치기</b>
+    <div class="hint">시간은 초(예: 12.5) 또는 분:초(예: 1:05.5)로 쓰세요. "지금"은 현재 재생 위치를 넣어요.</div>
+    <div id="rows" style="margin-top:8px"></div>
+    <div class="line"><button id="btnAdd">＋ 자막 줄 추가</button></div>
+  </div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const cv=$('cv'), c2=cv.getContext('2d');
+let W=1280,H=720;
+const bgVideo=document.createElement('video'); bgVideo.playsInline=true; bgVideo.preload='auto';
+const voice=new Audio(); voice.preload='auto';
+const bgm=new Audio(); bgm.preload='auto'; bgm.loop=true;
+let bgImg=null,bgKind=null;
+let rows=[],total=10;
+let playing=false,startWall=0,startT=0,curT=0;
+let ac=null,g={},monitor=null,dest=null;
+let stampMode=false,stampPtr=0;
+let seeking=false;
+let exporting=false,rec=null,chunks=[],exportCanceled=false;
+
+const round1=v=>Math.round(v*10)/10;
+function fmt(t){if(t==null||isNaN(t))return '';t=round1(t);const m=Math.floor(t/60);const s=t-m*60;return m+':'+s.toFixed(1).padStart(4,'0')}
+function parseT(s){s=String(s).trim();if(!s)return null;if(s.includes(':')){const p=s.split(':');const v=parseFloat(p[0])*60+parseFloat(p[1]);return isNaN(v)?null:v}const v=parseFloat(s);return isNaN(v)?null:v}
+function safePlay(m){const p=m.play();if(p&&p.catch)p.catch(()=>{})}
+
+/* ---------- 배경·소리 불러오기 ---------- */
+function autoDur(){
+  const vd=voice.getAttribute('src')&&isFinite(voice.duration)?voice.duration:0;
+  const bd=bgKind==='video'&&isFinite(bgVideo.duration)?bgVideo.duration:0;
+  const d=Math.max(vd,bd);
+  total=d>0?round1(d):(parseFloat($('dur').value)||10);
+  $('dur').value=total;
+}
+$('bgFile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const url=URL.createObjectURL(f);
+  if(f.type.startsWith('video/')){
+    bgKind='video';bgImg=null;
+    bgVideo.onloadedmetadata=()=>{autoDur();seek(0)};
+    bgVideo.src=url;bgVideo.load();
+  }else{
+    bgKind='image';bgVideo.removeAttribute('src');bgVideo.load();
+    const im=new Image();im.onload=()=>{bgImg=im;autoDur()};im.src=url;
+  }
+};
+$('voiceFile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  voice.onloadedmetadata=autoDur;
+  voice.src=URL.createObjectURL(f);voice.load();
+};
+$('bgmFile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  bgm.src=URL.createObjectURL(f);bgm.load();
+};
+$('voiceClr').onclick=()=>{voice.pause();voice.removeAttribute('src');voice.load();$('voiceFile').value='';autoDur()};
+$('bgmClr').onclick=()=>{bgm.pause();bgm.removeAttribute('src');bgm.load();$('bgmFile').value=''};
+$('dur').onchange=()=>{const v=parseFloat($('dur').value);if(v>0){total=v;if(curT>total)curT=total}else $('dur').value=total};
+$('ratio').onchange=()=>{
+  const r=$('ratio').value;
+  if(r==='16:9'){W=1280;H=720}else if(r==='9:16'){W=720;H=1280}else{W=720;H=720}
+  cv.width=W;cv.height=H;
+};
+
+/* ---------- 오디오 그래프 ---------- */
+function initAudio(){
+  if(ac)return;
+  ac=new (window.AudioContext||window.webkitAudioContext)();
+  dest=ac.createMediaStreamDestination();
+  monitor=ac.createGain();monitor.connect(ac.destination);
+  const mix=ac.createGain();mix.connect(monitor);mix.connect(dest);
+  g.v=ac.createGain();g.a=ac.createGain();g.b=ac.createGain();
+  ac.createMediaElementSource(bgVideo).connect(g.v);
+  ac.createMediaElementSource(voice).connect(g.a);
+  ac.createMediaElementSource(bgm).connect(g.b);
+  [g.v,g.a,g.b].forEach(n=>n.connect(mix));
+  applyVol();
+}
+function applyVol(){
+  if(!ac)return;
+  g.v.gain.value=$('vOrig').checked?$('vOrigVol').value/100:0;
+  g.a.gain.value=$('vVoice').value/100;
+  g.b.gain.value=$('vBgm').value/100;
+}
+['vVoice','vBgm','vOrig','vOrigVol'].forEach(id=>$(id).addEventListener('input',applyVol));
+
+/* ---------- 재생 ---------- */
+function startMedia(t){
+  if(bgKind==='video'&&bgVideo.getAttribute('src')&&isFinite(bgVideo.duration)){
+    if(t<bgVideo.duration){bgVideo.currentTime=t;safePlay(bgVideo)}else bgVideo.pause();
+  }
+  if(voice.getAttribute('src')&&isFinite(voice.duration)){
+    if(t<voice.duration){voice.currentTime=t;safePlay(voice)}else voice.pause();
+  }
+  if(bgm.getAttribute('src')&&isFinite(bgm.duration)&&bgm.duration>0){
+    bgm.currentTime=t%bgm.duration;safePlay(bgm);
+  }
+}
+function syncMedia(t){
+  if(bgKind==='video'&&isFinite(bgVideo.duration)){
+    if(t>=bgVideo.duration){if(!bgVideo.paused)bgVideo.pause()}
+    else if(Math.abs(bgVideo.currentTime-t)>0.4&&!bgVideo.seeking){bgVideo.currentTime=t;if(bgVideo.paused)safePlay(bgVideo)}
+  }
+  if(voice.getAttribute('src')&&isFinite(voice.duration)){
+    if(t>=voice.duration){if(!voice.paused)voice.pause()}
+    else if(Math.abs(voice.currentTime-t)>0.4&&!voice.seeking){voice.currentTime=t;if(voice.paused)safePlay(voice)}
+  }
+}
+function pauseMedia(){bgVideo.pause();voice.pause();bgm.pause()}
+function setMediaTime(t){
+  if(bgKind==='video'&&isFinite(bgVideo.duration))bgVideo.currentTime=Math.min(t,bgVideo.duration);
+  if(voice.getAttribute('src')&&isFinite(voice.duration))voice.currentTime=Math.min(t,voice.duration);
+}
+function play(from){
+  initAudio();if(ac.state==='suspended')ac.resume();
+  if(from!=null)curT=from;
+  if(curT>=total-0.05)curT=0;
+  startT=curT;startWall=performance.now();playing=true;
+  startMedia(curT);
+  $('btnPlay').textContent='⏸ 일시정지';
+}
+function pause(){
+  playing=false;pauseMedia();stampMode=false;$('btnStamp').disabled=true;
+  $('btnPlay').textContent='▶ 재생';
+}
+function seek(t){
+  curT=Math.max(0,Math.min(total,t));
+  if(playing){startT=curT;startWall=performance.now();startMedia(curT)}
+  else setMediaTime(curT);
+}
+function finishPlay(){
+  curT=total;pause();
+  if(exporting)setTimeout(()=>{if(rec&&rec.state!=='inactive')rec.stop()},400);
+}
+$('btnPlay').onclick=()=>{if(exporting)return;playing?pause():play()};
+$('btnHome').onclick=()=>{if(exporting)return;seek(0)};
+$('seek').addEventListener('input',()=>{if(exporting)return;seeking=true;seek($('seek').value/1000*total)});
+$('seek').addEventListener('change',()=>{seeking=false});
+
+/* ---------- 그리기 ---------- */
+function drawBg(){
+  c2.fillStyle='#000';c2.fillRect(0,0,W,H);
+  let src=null,sw=0,sh=0;
+  if(bgKind==='image'&&bgImg){src=bgImg;sw=bgImg.naturalWidth;sh=bgImg.naturalHeight}
+  else if(bgKind==='video'&&bgVideo.readyState>=2){src=bgVideo;sw=bgVideo.videoWidth;sh=bgVideo.videoHeight}
+  if(!src){
+    if(!bgKind){c2.fillStyle='#777';c2.font='28px sans-serif';c2.textAlign='center';c2.textBaseline='middle';c2.fillText('배경 이미지나 동영상을 불러오세요',W/2,H/2)}
+    return;
+  }
+  const sc=$('fit').value==='cover'?Math.max(W/sw,H/sh):Math.min(W/sw,H/sh);
+  const dw=sw*sc,dh=sh*sc;
+  c2.drawImage(src,(W-dw)/2,(H-dh)/2,dw,dh);
+}
+function activeIdx(t){
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(r.start!=null&&t>=r.start&&t<(r.end==null?total:r.end)&&r.text.trim())return i;
+  }
+  return -1;
+}
+function wrapText(text,maxW){
+  const out=[];
+  text.split('\n').forEach(par=>{
+    let line='';
+    par.split(' ').forEach(w=>{
+      const test=line?line+' '+w:w;
+      if(c2.measureText(test).width<=maxW){line=test;return}
+      if(line){out.push(line);line=''}
+      if(c2.measureText(w).width<=maxW){line=w;return}
+      let cur='';
+      for(const ch of w){
+        if(c2.measureText(cur+ch).width>maxW&&cur){out.push(cur);cur=ch}else cur+=ch;
+      }
+      line=cur;
+    });
+    out.push(line);
+  });
+  return out;
+}
+function drawSub(t){
+  const i=activeIdx(t);if(i<0)return;
+  const fs=+$('fs').value||48;
+  c2.font=($('bold').checked?'bold ':'')+fs+'px '+$('ff').value;
+  c2.textAlign='center';c2.textBaseline='middle';c2.lineJoin='round';
+  const lines=wrapText(rows[i].text.trim(),W*0.88);
+  const lh=fs*1.3,bh=lines.length*lh,pos=$('pos').value,mg=H*0.07;
+  const y0=pos==='top'?mg:pos==='mid'?(H-bh)/2:H-mg-bh;
+  if($('box').checked){
+    const bw=Math.max(...lines.map(l=>c2.measureText(l).width))+fs*0.8;
+    c2.fillStyle='rgba(0,0,0,0.55)';c2.fillRect((W-bw)/2,y0-fs*0.25,bw,bh+fs*0.5);
+  }
+  const ow=+$('ow').value;
+  lines.forEach((l,k)=>{
+    const y=y0+lh*k+lh/2;
+    if(ow>0){c2.lineWidth=ow*2;c2.strokeStyle=$('oc').value;c2.strokeText(l,W/2,y)}
+    c2.fillStyle=$('fc').value;c2.fillText(l,W/2,y);
+  });
+}
+let lastOn=-2;
+function updUI(){
+  if(!seeking)$('seek').value=total>0?Math.round(curT/total*1000):0;
+  $('tm').textContent=fmt(curT)+' / '+fmt(total);
+  const ai=activeIdx(curT);
+  if(ai!==lastOn){
+    lastOn=ai;
+    document.querySelectorAll('#rows .row').forEach((d,k)=>d.classList.toggle('on',k===ai));
+  }
+  if(exporting){
+    $('barIn').style.width=(total>0?curT/total*100:0)+'%';
+    $('expMsg').textContent='저장 중… '+fmt(curT)+' / '+fmt(total);
+  }
+}
+function loop(){
+  if(playing){
+    curT=startT+(performance.now()-startWall)/1000;
+    if(curT>=total)finishPlay();else syncMedia(curT);
+  }
+  drawBg();drawSub(curT);updUI();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- 자막 줄 ---------- */
+function renderRows(){
+  const box=$('rows'),sc=box.scrollTop;
+  box.innerHTML='';
+  rows.forEach((r,i)=>{
+    const d=document.createElement('div');d.className='row';
+    d.innerHTML='<div class="hd"><b>'+(i+1)+'번</b><span><button class="gray go">▶ 여기서 재생</button> <button class="red del">삭제</button></span></div>'
+      +'<textarea rows="2"></textarea>'
+      +'<div class="tm">시작 <input type="text" class="s"> <button class="gray ns">지금</button> 끝 <input type="text" class="e"> <button class="gray ne">지금</button></div>';
+    const ta=d.querySelector('textarea');ta.value=r.text;
+    ta.oninput=()=>{r.text=ta.value};
+    const si=d.querySelector('.s'),ei=d.querySelector('.e');
+    si.value=fmt(r.start);ei.value=fmt(r.end);
+    si.onchange=()=>{r.start=parseT(si.value);si.value=fmt(r.start)};
+    ei.onchange=()=>{r.end=parseT(ei.value);ei.value=fmt(r.end)};
+    d.querySelector('.ns').onclick=()=>{r.start=round1(curT);si.value=fmt(r.start)};
+    d.querySelector('.ne').onclick=()=>{r.end=round1(curT);ei.value=fmt(r.end)};
+    d.querySelector('.go').onclick=()=>{if(exporting)return;seek(r.start!=null?r.start:curT);if(!playing)play()};
+    d.querySelector('.del').onclick=()=>{rows.splice(i,1);renderRows()};
+    box.appendChild(d);
+  });
+  box.scrollTop=sc;lastOn=-2;
+}
+$('btnAdd').onclick=()=>{rows.push({text:'',start:null,end:null});renderRows();const b=$('rows');b.scrollTop=b.scrollHeight};
+
+$('btnSplit').onclick=()=>{
+  const txt=$('paste').value.trim();
+  if(!txt){alert('대본을 붙여넣어 주세요.');return}
+  if(rows.some(r=>r.text.trim())&&!confirm('지금 있는 자막 줄이 모두 지워지고 새로 나눠집니다. 계속할까요?'))return;
+  let parts;
+  if($('splitMode').value==='line')parts=txt.split(/\n+/);
+  else parts=txt.replace(/\n+/g,' ').match(/[^.!?。…]+[.!?。…]*["”’')\]]*/g)||[txt];
+  parts=parts.map(s=>s.trim()).filter(Boolean);
+  const mx=+$('maxLen').value;
+  if(mx>0){
+    const out=[];
+    parts.forEach(p=>{
+      while(p.length>mx){
+        let cut=p.lastIndexOf(' ',mx);
+        if(cut<mx*0.5)cut=mx;
+        out.push(p.slice(0,cut).trim());
+        p=p.slice(cut).trim();
+      }
+      if(p)out.push(p);
+    });
+    parts=out;
+  }
+  const wts=parts.map(p=>p.replace(/\s/g,'').length+2);
+  const sum=wts.reduce((a,b)=>a+b,0);
+  let acc=0;
+  rows=parts.map((p,i)=>{
+    const s=acc/sum*total;acc+=wts[i];const e=acc/sum*total;
+    return {text:p,start:round1(s),end:round1(e)};
+  });
+  renderRows();
+};
+
+/* ---------- "지금" 찍기 ---------- */
+$('btnStampStart').onclick=()=>{
+  if(exporting)return;
+  if(!rows.length){alert('먼저 자막 줄을 만들어 주세요. (붙여넣어 자동 나누기 또는 줄 추가)');return}
+  if(rows.some(r=>r.start!=null)&&!confirm('모든 줄의 시간을 지우고 처음부터 다시 찍을까요?'))return;
+  rows.forEach(r=>{r.start=null;r.end=null});renderRows();
+  stampPtr=0;stampMode=true;$('btnStamp').disabled=false;
+  pause();stampMode=true;$('btnStamp').disabled=false;
+  play(0);
+};
+function stampNext(){
+  if(!stampMode||!playing||stampPtr>=rows.length)return;
+  const t=round1(curT);
+  rows[stampPtr].start=t;rows[stampPtr].end=round1(total);
+  if(stampPtr>0)rows[stampPtr-1].end=t;
+  stampPtr++;
+  renderRows();
+  const el=$('rows').children[stampPtr-1];if(el)el.scrollIntoView({block:'nearest'});
+}
+$('btnStamp').onclick=e=>{stampNext();e.target.blur()};
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&stampMode&&playing&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){e.preventDefault();stampNext()}
+});
+document.addEventListener('keyup',e=>{
+  if(e.code==='Space'&&stampMode&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))e.preventDefault();
+});
+
+/* ---------- 영상으로 저장 ---------- */
+function pickMime(){
+  const mp4=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1,mp4a.40.2','video/mp4'];
+  const webm=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  const list=$('fmt').value==='webm'?webm:mp4.concat(webm);
+  return list.find(m=>MediaRecorder.isTypeSupported(m))||'';
+}
+function startExport(){
+  if(exporting)return;
+  if(!bgKind){alert('먼저 배경 이미지나 동영상을 불러오세요.');return}
+  if(!window.MediaRecorder||!cv.captureStream){alert('이 브라우저는 영상 저장을 지원하지 않아요. PC 크롬이나 엣지를 쓰세요.');return}
+  pause();initAudio();
+  if(ac.state==='suspended')ac.resume();
+  monitor.gain.value=0;
+  const mime=pickMime();
+  const stream=cv.captureStream(30);
+  dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  try{rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:6000000}:{})}
+  catch(err){monitor.gain.value=1;alert('저장을 시작하지 못했어요: '+err.message);return}
+  chunks=[];exportCanceled=false;
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  rec.onstop=onExportDone;
+  exporting=true;
+  $('btnExp').disabled=true;$('btnCancel').style.display='';
+  $('result').style.display='none';$('barIn').style.width='0';
+  rec.start(500);
+  play(0);
+}
+function onExportDone(){
+  exporting=false;
+  if(monitor)monitor.gain.value=1;
+  $('btnExp').disabled=false;$('btnCancel').style.display='none';
+  if(exportCanceled){$('expMsg').textContent='저장을 취소했어요.';$('barIn').style.width='0';return}
+  const type=(rec&&rec.mimeType)||'video/webm';
+  const blob=new Blob(chunks,{type});
+  const url=URL.createObjectURL(blob);
+  const ext=type.includes('mp4')?'mp4':'webm';
+  $('resV').src=url;
+  const a=$('dlA');a.href=url;a.download='자막영상.'+ext;
+  $('resInfo').textContent=ext.toUpperCase()+' · '+(blob.size/1048576).toFixed(1)+'MB'+(ext==='webm'?' (카톡·폰 재생이 안 되면 MP4로 변환하세요)':'');
+  $('result').style.display='';
+  $('barIn').style.width='100%';
+  $('expMsg').textContent='저장이 끝났어요.';
+  curT=0;
+}
+$('btnExp').onclick=startExport;
+$('btnCancel').onclick=()=>{
+  if(!exporting)return;
+  exportCanceled=true;pause();
+  if(rec&&rec.state!=='inactive')rec.stop();
+};
+
+renderRows();
+</script>
+</body>
+</html>
