@@ -33,7 +33,16 @@ section h2{font-size:14pt;font-weight:600;margin:0 0 10px;color:#f4f8fc}
 b{color:#f4f8fc}
 hr{border:0;border-top:1px solid #455c70;margin:12px 0}
 .line{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
-.hint{color:#dbe6f0}
+.hint{color:#dbe6f0;font-size:12pt}
+/* 한 줄에 맞춰 줄어드는 줄 (버튼이 아랫줄로 밀리지 않게) */
+.line.nw{flex-wrap:nowrap;gap:6px}
+.line.nw input[type=file]{min-width:0;flex:1 1 0;overflow:hidden}
+.line.nw select{min-width:0;flex:1 1 0}
+.line.nw button{flex:none;white-space:nowrap}
+/* ---- 두 카드를 한 줄에 ---- */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.pair>section{margin-bottom:0;min-width:0}
+@media (max-width:860px){.pair{grid-template-columns:1fr}}
 
 /* ---- 버튼 ---- */
 button,input,select,textarea{font:inherit;font-size:14pt;color:inherit}
@@ -136,9 +145,10 @@ a.dl:hover{background:#ffc56b}
     </div>
   </section>
 
+  <div class="pair">
   <section>
     <h2>1. 배경</h2>
-    <div class="line">화면 비율
+    <div class="line nw">화면 비율
       <select id="ratio">
         <option value="16:9">가로 16:9 (유튜브)</option>
         <option value="9:16">세로 9:16 (폰)</option>
@@ -157,14 +167,16 @@ a.dl:hover{background:#ffc56b}
 
   <section>
     <h2>2. 소리</h2>
-    <div class="line">음성 파일 <input type="file" id="voiceFile" accept="audio/*"> <button id="voiceClr" class="gray">지우기</button></div>
+    <div class="line nw">음성 파일 <input type="file" id="voiceFile" accept="audio/*"> <button id="voiceClr" class="gray">지우기</button></div>
     <div class="line">음성 볼륨 <input type="range" id="vVoice" class="vol" min="0" max="200" value="100"></div>
-    <div class="line">배경음악 <input type="file" id="bgmFile" accept="audio/*"> <button id="bgmClr" class="gray">지우기</button></div>
+    <div class="line nw">배경음악 <input type="file" id="bgmFile" accept="audio/*"> <button id="bgmClr" class="gray">지우기</button></div>
     <div class="line">배경음악 볼륨 <input type="range" id="vBgm" class="vol" min="0" max="200" value="30">
       <span class="hint">영상보다 짧으면 반복돼요.</span></div>
     <div class="line"><label><input type="checkbox" id="vOrig" checked> 동영상 원래 소리 쓰기</label>
       볼륨 <input type="range" id="vOrigVol" class="vol" min="0" max="200" value="100"></div>
   </section>
+
+  </div>
 
   <section>
     <h2>3. 자막</h2>
@@ -190,6 +202,7 @@ a.dl:hover{background:#ffc56b}
     <div class="line"><button id="btnAdd">＋ 자막 줄 추가</button></div>
   </section>
 
+  <div class="pair">
   <section>
     <h2>4. 자막 꾸미기</h2>
     <div class="line">글자 크기 <input type="number" id="fs" value="48" min="10" max="200" style="width:5em">
@@ -226,6 +239,7 @@ a.dl:hover{background:#ffc56b}
       <div class="line"><a id="dlA" class="dl" download>⬇ 영상 파일 내려받기</a><span id="resInfo" class="hint"></span></div>
     </div>
   </section>
+  </div>
 
 </div>
 
